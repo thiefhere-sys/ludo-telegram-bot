@@ -5,9 +5,7 @@ from google import genai
 from PIL import Image
 from flask import Flask
 
-# -------------------------------------------------------------
-# 1. Fake Web Server (Render Free Hosting ke liye)
-# -------------------------------------------------------------
+# 1. Fake Web Server for Render Free Tier
 app = Flask(__name__)
 
 @app.route('/')
@@ -18,18 +16,14 @@ def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
-# -------------------------------------------------------------
-# 2. Bot aur Gemini API Setup
-# -------------------------------------------------------------
-BOT_TOKEN = os.getenv("BOT_TOKEN")
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# 2. Bot & Gemini API Setup
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 
 bot = telebot.TeleBot(BOT_TOKEN)
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# -------------------------------------------------------------
-# 3. Gemini Vision AI Game Analyzer (Universal Strategy Engine)
-# -------------------------------------------------------------
+# 3. Gemini Vision AI Game Analyzer
 def analyze_game_board(image_path):
     try:
         image = Image.open(image_path)
@@ -45,14 +39,15 @@ def analyze_game_board(image_path):
             "🎯 **100% BEST MOVE:**\n"
             "[Exact piece/token to move and target position]\n\n"
             "⚔️ **WHY THIS MOVE:**\n"
-            "[Short tactical advantage, e.g., Cut opponent token / Checkmate attack / Safe Star position]\n\n"
+            "[Short tactical advantage]\n\n"
             "🏆 **WINNING STRATEGY:**\n"
-            "[Next 1-2 steps to dominate and win the game]\n\n"
+            "[Next steps to win]\n\n"
             "Keep the reply concise, sharp, direct, and encouraging."
         )
 
+        # Updated model name here
         response = client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-2.0-flash',
             contents=[image, prompt]
         )
         return response.text
@@ -60,14 +55,12 @@ def analyze_game_board(image_path):
     except Exception as e:
         return f"⚠️ Board scan karne me problem aayi: {str(e)}"
 
-# -------------------------------------------------------------
-# 4. Telegram Bot Event Handlers
-# -------------------------------------------------------------
+# 4. Telegram Handlers
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
     welcome_text = (
         "🎮 **UNIVERSAL AI GAME MASTER BOT READY!** 🎮\n\n"
-        "Main **Chess, Ludo, Carrom** ya kisi bhi board game ko scan karke 100% winning moves bata sakta hoon!\n\n"
+        "Main Chess, Ludo, Carrom ya kisi bhi board game ko scan karke 100% winning moves bata sakta hoon!\n\n"
         "📸 Bas apne game board ki clear photo click karke mujhe bhejien."
     )
     bot.reply_to(message, welcome_text, parse_mode="Markdown")
@@ -81,7 +74,6 @@ def handle_photo(message):
             "⚡ 100% Winning Move Calculate Ho Rahi Hai, Wait Karein! ⏳"
         )
 
-        # Photo Download Logic
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded_file = bot.download_file(file_info.file_path)
 
@@ -89,22 +81,17 @@ def handle_photo(message):
         with open(image_path, 'wb') as new_file:
             new_file.write(downloaded_file)
 
-        # AI Analysis
         analysis_result = analyze_game_board(image_path)
         bot.reply_to(message, analysis_result, parse_mode="Markdown")
 
-        # Cleanup image
         if os.path.exists(image_path):
             os.remove(image_path)
 
     except Exception as e:
         bot.reply_to(message, f"❌ Error: {str(e)}")
 
-# -------------------------------------------------------------
 # 5. Main Execution
-# -------------------------------------------------------------
 if __name__ == "__main__":
-    # Web server parallel thread me start hoga
     server_thread = Thread(target=run_web_server)
     server_thread.start()
     
