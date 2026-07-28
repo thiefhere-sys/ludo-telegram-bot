@@ -1,4 +1,4 @@
 pyTelegramBotAPI
 opencv-python-headless
 numpy
-
+flask
