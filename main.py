@@ -1,73 +1,110 @@
-import telebot
-import cv2
-import numpy as np
 import os
-from flask import Flask
 from threading import Thread
+import telebot
+from google import genai
+from PIL import Image
+from flask import Flask
 
-# Fake Web Server for Render Free Tier
+# -------------------------------------------------------------
+# 1. Fake Web Server (Render Free Hosting ke liye)
+# -------------------------------------------------------------
 app = Flask(__name__)
 
 @app.route('/')
 def home():
-    return "Ludo Bot is Running Live!"
+    return "Universal AI Game Master Bot is Running Live!"
 
 def run_web_server():
     port = int(os.environ.get("PORT", 8080))
     app.run(host='0.0.0.0', port=port)
 
-# Telegram Bot Setup
+# -------------------------------------------------------------
+# 2. Bot aur Gemini API Setup
+# -------------------------------------------------------------
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
 bot = telebot.TeleBot(BOT_TOKEN)
+client = genai.Client(api_key=GEMINI_API_KEY)
 
-def analyze_ludo_image(image_path):
-    img = cv2.imread(image_path)
-    if img is None:
-        return "Image read nahi ho paayi, kripya clear photo bhejein."
+# -------------------------------------------------------------
+# 3. Gemini Vision AI Game Analyzer (Universal Strategy Engine)
+# -------------------------------------------------------------
+def analyze_game_board(image_path):
+    try:
+        image = Image.open(image_path)
+        
+        prompt = (
+            "You are an expert World-Class Grandmaster Game Analyst trained for 100% winning accuracy in board games. "
+            "Examine this image carefully and follow these rules:\n\n"
+            "1. First, identify the game (e.g., Chess, Ludo, Carrom, Tic-Tac-Toe, Sudoku, etc.).\n"
+            "2. Carefully scan the board positions, pieces, or tokens.\n"
+            "3. Give the absolute BEST NEXT MOVE that guarantees maximum winning probability (100% winning tactic).\n"
+            "4. Format your response strictly in simple Hinglish (Hindi + English) like this:\n\n"
+            "🎮 **GAME DETECTED:** [Game Name]\n\n"
+            "🎯 **100% BEST MOVE:**\n"
+            "[Exact piece/token to move and target position]\n\n"
+            "⚔️ **WHY THIS MOVE:**\n"
+            "[Short tactical advantage, e.g., Cut opponent token / Checkmate attack / Safe Star position]\n\n"
+            "🏆 **WINNING STRATEGY:**\n"
+            "[Next 1-2 steps to dominate and win the game]\n\n"
+            "Keep the reply concise, sharp, direct, and encouraging."
+        )
 
-    hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=[image, prompt]
+        )
+        return response.text
 
-    lower_red = np.array([0, 120, 70])
-    upper_red = np.array([10, 255, 255])
-    mask_red = cv2.inRange(hsv, lower_red, upper_red)
-    red_count = cv2.countNonZero(mask_red)
+    except Exception as e:
+        return f"⚠️ Board scan karne me problem aayi: {str(e)}"
 
-    suggestion = "🎯 **LUDO BOT BEST MOVE:**\n\n"
-    
-    if red_count > 300:
-        suggestion += "1. ⚔️ **Priority 1:** Opponent ki goti cut kar sakte ho toh pehle KILL karo!\n"
-        suggestion += "2. 🛡️ **Priority 2:** Safe zone (Star) par apni goti shift karo.\n"
-        suggestion += "3. 🚀 **Priority 3:** Home Path ki taraf goti ko aage badhao."
-    else:
-        suggestion += "1. Gotiyan sahi se scan nahi ho paayi, board ki seedhi photo bhejein.\n"
-        suggestion += "2. Agar 6 aaya hai toh naya token open karein."
-
-    return suggestion
-
+# -------------------------------------------------------------
+# 4. Telegram Bot Event Handlers
+# -------------------------------------------------------------
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    bot.reply_to(message, "👋 **Ludo AI Bot Ready Hai!**\n\nGame board ki photo bhejo, main best move batata hoon.")
+    welcome_text = (
+        "🎮 **UNIVERSAL AI GAME MASTER BOT READY!** 🎮\n\n"
+        "Main **Chess, Ludo, Carrom** ya kisi bhi board game ko scan karke 100% winning moves bata sakta hoon!\n\n"
+        "📸 Bas apne game board ki clear photo click karke mujhe bhejien."
+    )
+    bot.reply_to(message, welcome_text, parse_mode="Markdown")
 
 @bot.message_handler(content_types=['photo'])
 def handle_photo(message):
     try:
-        bot.reply_to(message, "🔍 Board scan ho raha hai, wait karein...")
+        bot.reply_to(
+            message, 
+            "🧠 **AI Board Scan Kar Raha Hai...**\n"
+            "⚡ 100% Winning Move Calculate Ho Rahi Hai, Wait Karein! ⏳"
+        )
 
+        # Photo Download Logic
         file_info = bot.get_file(message.photo[-1].file_id)
         downloaded_file = bot.download_file(file_info.file_path)
 
-        image_path = "ludo_board.jpg"
+        image_path = "game_board.jpg"
         with open(image_path, 'wb') as new_file:
             new_file.write(downloaded_file)
 
-        result = analyze_ludo_image(image_path)
-        bot.reply_to(message, result, parse_mode="Markdown")
+        # AI Analysis
+        analysis_result = analyze_game_board(image_path)
+        bot.reply_to(message, analysis_result, parse_mode="Markdown")
+
+        # Cleanup image
+        if os.path.exists(image_path):
+            os.remove(image_path)
 
     except Exception as e:
-        bot.reply_to(message, f"Error: {str(e)}")
+        bot.reply_to(message, f"❌ Error: {str(e)}")
 
+# -------------------------------------------------------------
+# 5. Main Execution
+# -------------------------------------------------------------
 if __name__ == "__main__":
-    # Start web server in background thread
+    # Web server parallel thread me start hoga
     server_thread = Thread(target=run_web_server)
     server_thread.start()
     
