@@ -2,8 +2,21 @@ import telebot
 import cv2
 import numpy as np
 import os
+from flask import Flask
+from threading import Thread
 
-# Render ya hosting server se Token uthayega (Security ke liye)
+# Fake Web Server for Render Free Tier
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "Ludo Bot is Running Live!"
+
+def run_web_server():
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host='0.0.0.0', port=port)
+
+# Telegram Bot Setup
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 bot = telebot.TeleBot(BOT_TOKEN)
 
@@ -14,7 +27,6 @@ def analyze_ludo_image(image_path):
 
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-    # Red color range detection
     lower_red = np.array([0, 120, 70])
     upper_red = np.array([10, 255, 255])
     mask_red = cv2.inRange(hsv, lower_red, upper_red)
@@ -55,5 +67,9 @@ def handle_photo(message):
         bot.reply_to(message, f"Error: {str(e)}")
 
 if __name__ == "__main__":
+    # Start web server in background thread
+    server_thread = Thread(target=run_web_server)
+    server_thread.start()
+    
     print("Bot starting...")
-    bot.polling()
+    bot.polling(non_stop=True)
